@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
                 self.button1 = QPushButton('OTP')
                 self.button2 = QPushButton('EQ_RDLOG')
                 self.button3 = QPushButton('監控SSL')
+                self.text1 = QTextEdit()
 
                 self.button1.setStyleSheet('background:	transparent; background-color: #FFA823; color: #805300; font: bold 30px')
                 self.button2.setStyleSheet('background:	transparent; background-color: #FFA823; color: #805300; font: bold 30px')
@@ -56,9 +57,10 @@ class MainWindow(QMainWindow):
 
         # frame
                 self.layout = QGridLayout()
-                self.layout.addWidget(self.button1, 0, 0) #x, y, 佔幾行, 幾列
+                self.layout.addWidget(self.button1, 0, 0) #x, y, 佔據幾行, 幾列
                 self.layout.addWidget(self.button2, 1, 0)
-                self.layout.addWidget(self.button3, 2, 0, 2, 1)
+                self.layout.addWidget(self.button3, 2, 0, 1, 3)
+                self.layout.addWidget(self.text1, 3, 0, 2, 3)
 
                 self.main_frame = QWidget()
                 self.main_frame.setLayout(self.layout)
