@@ -195,7 +195,7 @@ class SSLDemo(QWidget):
         def __init__(self):
                 super().__init__()
                 
-                self.resize(400, 300)
+                self.resize(600, 300)
                 self.ssltext = QTextEdit()
                 self.sslbtn = QPushButton('檢測')
                 self.ssltext.setReadOnly(True)
@@ -307,12 +307,17 @@ class SllThread(QThread):
                 for key, value in config.items('SSL'):
                         now = datetime.datetime.now()
                         try:
+                                self.update.emit(f"<font color='green' size='6' face='Arial'>================= </font>")
                                 expire = self.ssl_expiry_datetime(key, value)
                                 diff = expire - now
                                 expire_new = expire.strftime("%Y-%m-%d")
-                                ssl = "域名": " + (str(key)) + "  Expiry Date: " + (str(expire_new)) + "  Expiry Day: " +  (str(diff.days))
-                                self.update.emit(ssl)
-                                print(ssl)
+                                DomainName = "DomainName: " + (str(key)) 
+                                ExpiryDate = "ExpiryDate: " + (str(expire_new)) 
+                                ExpiryDay = "ExpiryDay: " +  (str(diff.days))
+                                self.update.emit(DomainName)
+                                self.update.emit(ExpiryDate)
+                                self.update.emit(ExpiryDay)
+                                
                                 
                                 
                         except Exception as e:
