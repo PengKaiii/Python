@@ -7,6 +7,9 @@ import paramiko
 import datetime
 import time
 import configparser
+import socket
+import ssl
+import schedule
 
 config = configparser.ConfigParser()
 now = datetime.datetime.now().strftime("%Y%m%d")    #設定當下時間(年月日)
@@ -39,6 +42,7 @@ selection-color:	color	设定选中时候的颜色
 ————————————————
 原文链接：https://blog.csdn.net/qq_42250189/article/details/105199339
 """
+
 class MainWindow(QMainWindow):
         def __init__(self):
                 super(MainWindow, self).__init__()
@@ -49,6 +53,7 @@ class MainWindow(QMainWindow):
                 self.button2 = QPushButton('EQ_RDLOG')
                 self.button3 = QPushButton('監控SSL')
                 self.text1 = QTextEdit()
+                self.text1.setReadOnly(True)
 
                 self.button1.setStyleSheet('background:	transparent; background-color: #FFA823; color: #805300; font: bold 30px')
                 self.button2.setStyleSheet('background:	transparent; background-color: #FFA823; color: #805300; font: bold 30px')
@@ -70,15 +75,15 @@ class MainWindow(QMainWindow):
         # Sub Window
                 self.sub_window = TextEditDemo()
                 self.sub2_window = App()
+                self.sub3_window = SSLDemo()
 
         
         # Button Event
                 self.button1.clicked.connect(self.sub_window.show)
-                
                 self.button2.clicked.connect(self.sub2_window.show)
+                self.button3.clicked.connect(self.sub3_window.show)
                 
-
-		
+                		
 class TextEditDemo(QWidget):
         def __init__(self):
                 super().__init__()
@@ -126,7 +131,6 @@ class TextEditDemo(QWidget):
 
 
 class App(QWidget):
-
 
         def __init__(self):
                 super().__init__()
@@ -187,10 +191,39 @@ class App(QWidget):
         def error(self, e):
                 self.textEdit.append(f"<font color='red' size='6' face='DFKai-sb'> {e} </font>")
 
+class SSLDemo(QWidget):
+        def __init__(self):
+                super().__init__()
+                
+                self.resize(400, 300)
+                self.ssltext = QTextEdit()
+                self.sslbtn = QPushButton('檢測')
+                self.ssltext.setReadOnly(True)
 
+                layout = QVBoxLayout()
+                layout.addWidget(self.ssltext)
+                layout.addWidget(self.sslbtn)    		
+                self.setLayout(layout)
 
+                #啟動
+                self.sslbtn.clicked.connect(self.start)
+        
+        def start(self):
+                self.log_thread = SllThread() #在此實例化是為了讓run()線程中得到參數
+                self.log_thread.start()  #開始線程
+                self.log_thread.update.connect(self.ap)  #信號連接槽函數
+                self.log_thread.error.connect(self.err) #信號連接槽函數
 
+        def ap(self, ssl):
+                self.ssltext.append(f"<font color='blue' size='6' face='DFKai-sb'> {ssl} </font>")
+                #self.log_thread.update.connect(self.log) 信號連接槽,傳入數值(i)這可以隨意設變數,主要是發射那邊參數是甚麼
+                #也能在裡面新增其他self.textEdit.append,照著下面發射的for迴圈逐一顯示
 
+        def err(self, e):
+                self.ssltext.append(f"<font color='red' size='6' face='DFKai-sb'> {e} </font>")               
+
+   
+        
 class AppThread(QThread):   
 
         update  = pyqtSignal(str)  #定義str信號槽
@@ -225,8 +258,67 @@ class AppThread(QThread):
                                 self.error.emit(err)
                                 print(e)
                                 time.sleep(1) 
-
+class SllThread(QThread):
+        #QThread 使用這模組範例
+        """
+        class Thread(QThread):
+            def __init__(self):
+            super(Thread,self).__init__()
+            def run(self):
+        """
+        update  = pyqtSignal(str)  #定義str信號槽
+        error = pyqtSignal(str)    #定義str信號槽   
+        def __init__(self):  #初始化
+            super().__init__()           
         
+        
+        def ssl_expiry_datetime(self, hostname, port):
+                ssl_dateformat = r'%b %d %H:%M:%S %Y %Z'
+                #%b 本地简化的月份名称
+                #%d 月内中的一天（0-31）
+                #%H 24小时制小时数（0-23）
+                #%M 分钟数（00=59）
+                #%S 秒（00-59）
+                #%Y 四位数的年份表示（000-9999）
+                #%Z 当前时区的名称
+                #datetime.datetime.strptime(ssl_info['notAfter'] 輸出來的時間 'Sep  9 12:00:00 2016 GMT' 
+                #strptime 接收以時間元組，並返回以可讀字符串表示的當地時間，格式由參數format 決定。 2021-10-12 09:07:45
+
+                context = ssl.create_default_context()  #這個例子創建了一個SSL 上下文並使用客戶端套接字的推薦安全設置，包括自動證書驗證:
+                context.check_hostname = False   #是否要啟用主機名檢查
+
+                conn = context.wrap_socket(
+                        socket.socket(socket.AF_INET),
+                        server_hostname=hostname,
+                        )
+                # 5 second timeout
+                conn.settimeout(5.0)   
+                port = int(port)
+                conn.connect((hostname, port))
+                ssl_info = conn.getpeercert()
+                # Python datetime object
+                #傳值ssl_info['notAfter']只要'notAfter'這段內容
+                #ssl_dateformat 轉換格式(西元:年 月 日 時:分:秒)
+
+                return datetime.datetime.strptime(ssl_info['notAfter'], ssl_dateformat)
+        
+        def run(self):
+                config.read(r'C:\Users\kai.hsu\Desktop\KAI\python\python3\IT3\config.ini')
+                for key, value in config.items('SSL'):
+                        now = datetime.datetime.now()
+                        try:
+                                expire = self.ssl_expiry_datetime(key, value)
+                                diff = expire - now
+                                expire_new = expire.strftime("%Y-%m-%d")
+                                ssl = "域名": " + (str(key)) + "  Expiry Date: " + (str(expire_new)) + "  Expiry Day: " +  (str(diff.days))
+                                self.update.emit(ssl)
+                                print(ssl)
+                                
+                                
+                        except Exception as e:
+                                self.error.emit(e)
+                                print (e)     
+
 
 if __name__ == '__main__':
     app = QApplication([])
