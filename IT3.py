@@ -10,6 +10,7 @@ import configparser
 import socket
 import ssl
 import schedule
+import threading
 
 config = configparser.ConfigParser()
 now = datetime.datetime.now().strftime("%Y%m%d")    #設定當下時間(年月日)
@@ -19,7 +20,7 @@ local_path = ( './rdlog.log'
                 +  '_' )#本地位置
 
 remote_path = '/var/log/nginx/rdlog.log-' + now + '.gz'    #遠端linux主機  
-
+ssldate = []
 
 """
 color:	white rgb(110,110,110) #eb7350	前景颜色，字体颜色
@@ -76,14 +77,25 @@ class MainWindow(QMainWindow):
                 self.sub_window = TextEditDemo()
                 self.sub2_window = App()
                 self.sub3_window = SSLDemo()
-
+                self.sslrun = SllThread()
         
         # Button Event
                 self.button1.clicked.connect(self.sub_window.show)
                 self.button2.clicked.connect(self.sub2_window.show)
                 self.button3.clicked.connect(self.sub3_window.show)
                 
-                		
+
+                self.ssl_thread = threading.Thread(target=self.job) #在此實例化是為了讓run()線程中得到參數
+                self.ssl_thread.start()  #開始線程
+                
+        def job(self): 
+                
+                schedule.every(5).seconds.do(self.sslrun.run)
+                
+                while True:
+                        schedule.run_pending()  #開始執行排程
+                        time.sleep(1)
+                        		
 class TextEditDemo(QWidget):
         def __init__(self):
                 super().__init__()
@@ -195,19 +207,23 @@ class SSLDemo(QWidget):
         def __init__(self):
                 super().__init__()
                 
-                self.resize(600, 300)
+                self.resize(500, 300)
                 self.ssltext = QTextEdit()
                 self.sslbtn = QPushButton('檢測')
                 self.ssltext.setReadOnly(True)
+                self.SllClr = QPushButton("清除內容")
 
                 layout = QVBoxLayout()
                 layout.addWidget(self.ssltext)
-                layout.addWidget(self.sslbtn)    		
+                layout.addWidget(self.sslbtn)    
+                layout.addWidget(self.SllClr)		
                 self.setLayout(layout)
 
                 #啟動
                 self.sslbtn.clicked.connect(self.start)
-        
+                self.SllClr.clicked.connect(self.ssltext.clear)
+                
+
         def start(self):
                 self.log_thread = SllThread() #在此實例化是為了讓run()線程中得到參數
                 self.log_thread.start()  #開始線程
@@ -215,9 +231,10 @@ class SSLDemo(QWidget):
                 self.log_thread.error.connect(self.err) #信號連接槽函數
 
         def ap(self, ssl):
-                self.ssltext.append(f"<font color='blue' size='6' face='DFKai-sb'> {ssl} </font>")
+                self.ssltext.append(ssl)
                 #self.log_thread.update.connect(self.log) 信號連接槽,傳入數值(i)這可以隨意設變數,主要是發射那邊參數是甚麼
                 #也能在裡面新增其他self.textEdit.append,照著下面發射的for迴圈逐一顯示
+        
 
         def err(self, e):
                 self.ssltext.append(f"<font color='red' size='6' face='DFKai-sb'> {e} </font>")               
@@ -234,7 +251,7 @@ class AppThread(QThread):
             super().__init__()
             self.username = username    #屬性
             self.password = password    #屬性
-
+                
         #def __del__(self):
                 #self.wait()
        
@@ -267,11 +284,15 @@ class SllThread(QThread):
             def run(self):
         """
         update  = pyqtSignal(str)  #定義str信號槽
-        error = pyqtSignal(str)    #定義str信號槽   
+        update1  = pyqtSignal(str)
+        error = pyqtSignal(str)    #定義str信號槽 
+        global ssldate  
         def __init__(self):  #初始化
-            super().__init__()           
-        
-        
+                super().__init__()
+                
+                       
+
+       
         def ssl_expiry_datetime(self, hostname, port):
                 ssl_dateformat = r'%b %d %H:%M:%S %Y %Z'
                 #%b 本地简化的月份名称
@@ -307,26 +328,30 @@ class SllThread(QThread):
                 for key, value in config.items('SSL'):
                         now = datetime.datetime.now()
                         try:
-                                self.update.emit(f"<font color='green' size='6' face='Arial'>================= </font>")
+                                self.update.emit(f"<font color='yellow' size='6' face='Arial'>============</font>")
                                 expire = self.ssl_expiry_datetime(key, value)
                                 diff = expire - now
                                 expire_new = expire.strftime("%Y-%m-%d")
-                                DomainName = "DomainName: " + (str(key)) 
-                                ExpiryDate = "ExpiryDate: " + (str(expire_new)) 
-                                ExpiryDay = "ExpiryDay: " +  (str(diff.days))
-                                self.update.emit(DomainName)
-                                self.update.emit(ExpiryDate)
-                                self.update.emit(ExpiryDay)
-                                
-                                
+                                domain = "Domain name: " + (str(key))
+                                expirydate = "Expiry Date: " + (str(expire_new))
+                                expiryday = "Expiry Day: " + (str(diff.days))
+                                self.update.emit(f"<font color='blue' size='6' face='Arial'>{domain} </font>")
+                                self.update.emit(f"<font color='green' size='6' face='Arial'>{expirydate} </font>")
+                                self.update.emit(f"<font color='red' size='6' face='Arial'>{expiryday} </font>")
+
+                                if diff.days < 30:
+                                        ssldate.append(domain + expirydate + expiryday)
+                        
                                 
                         except Exception as e:
                                 self.error.emit(e)
                                 print (e)     
-
+                
 
 if __name__ == '__main__':
     app = QApplication([])
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+        
